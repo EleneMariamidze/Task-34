@@ -1,0 +1,131 @@
+class User:
+    def __init__(self, username, email):
+        self.username = username
+        self.email = email
+        self.recipes = []
+
+    def add_recipe(self, recipe):
+        self.recipes.append(recipe)
+
+    def modify_recipe(self, old_recipe_name, new_recipe):
+        for i, recipe in enumerate(self.recipes):
+            if recipe['name'] == old_recipe_name:
+                self.recipes[i] = new_recipe
+                break
+
+    def delete_recipe(self, recipe_name):
+        for i, recipe in enumerate(self.recipes):
+            if recipe['name'] == recipe_name:
+                del self.recipes[i]
+                break
+
+
+class RecipeApp:
+    def __init__(self):
+        self.users = {}
+
+    def register_user(self, username, email):
+        if username not in self.users:
+            self.users[username] = User(username, email)
+
+    def add_recipe(self, username, recipe):
+        if username in self.users:
+            self.users[username].add_recipe(recipe)
+
+    def modify_recipe(self, username, old_recipe_name, new_recipe):
+        if username in self.users:
+            self.users[username].modify_recipe(old_recipe_name, new_recipe)
+
+    def delete_recipe(self, username, recipe_name):
+        if username in self.users:
+            self.users[username].delete_recipe(recipe_name)
+
+
+# Example usage
+app = RecipeApp()
+
+# Register users
+app.register_user("user1", "user1@example.com")
+app.register_user("user2", "user2@example.com")
+
+# Adding recipes
+app.add_recipe("user1", {"name": "Pasta Carbonara", "ingredients": ["pasta", "bacon", "eggs", "cheese"]})
+app.add_recipe("user1", {"name": "Chocolate Cake", "ingredients": ["flour", "sugar", "cocoa", "eggs", "butter"]})
+
+# Modifying a recipe
+app.modify_recipe("user1", "Pasta Carbonara", {"name": "Spaghetti Carbonara", "ingredients": ["spaghetti", "bacon", "eggs", "cheese"]})
+
+# Deleting a recipe
+app.delete_recipe("user1", "Chocolate Cake")
+
+models.py
+from django.db import models
+from django.contrib.auth.models import User
+
+class Recipe(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    ingredients = models.TextField()
+
+    def __str__(self):
+        return self.name
+
+serializers.py
+from rest_framework import serializers
+from .models import Recipe
+
+class RecipeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Recipe
+        fields = ('id', 'user', 'name', 'ingredients')
+
+views.py
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import Recipe
+from .serializers import RecipeSerializer
+
+class RecipeViewSet(viewsets.ModelViewSet):
+    queryset = Recipe.objects.all()
+    serializer_class = RecipeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def get_queryset(self):
+        return Recipe.objects.filter(user=self.request.user)
+
+urls.py
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import RecipeViewSet
+
+router = DefaultRouter()
+router.register(r'recipes', RecipeViewSet)
+
+urlpatterns = [
+    path('', include(router.urls)),
+]
+
+
+settings.py
+INSTALLED_APPS = [
+    ...
+    'rest_framework',
+    'your_app_name',  # Replace 'your_app_name' with the name of your Django app
+    ...
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
+
+
